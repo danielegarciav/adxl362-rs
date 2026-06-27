@@ -53,8 +53,8 @@ use embedded_hal_bus::spi::ExclusiveDevice;
 use panic_probe as _;
 
 use adxl362::{
-    ActivityConfig, Adxl362, InactivityConfig, IntPin, IntSources, LinkLoopMode,
-    NoiseMode, OutputDataRate, Range,
+    ActivityConfig, Adxl362, InactivityConfig, IntPin, IntSources, LinkLoopMode, NoiseMode,
+    OutputDataRate, Range,
 };
 
 bind_interrupts!(struct Irqs {
@@ -75,8 +75,8 @@ async fn main(_spawner: Spawner) {
     config.mode = spim::MODE_0;
 
     let spim = Spim::new(p.SPI3, Irqs, p.P0_29, p.P0_28, p.P0_30, config);
-    let cs   = Output::new(p.P0_31, Level::High, OutputDrive::Standard);
-    let spi  = ExclusiveDevice::new_no_delay(spim, cs).unwrap();
+    let cs = Output::new(p.P0_31, Level::High, OutputDrive::Standard);
+    let spi = ExclusiveDevice::new_no_delay(spim, cs).unwrap();
 
     let mut accel = Adxl362::new(spi).await.expect("ADXL362 not found");
 
@@ -85,16 +85,23 @@ async fn main(_spawner: Spawner) {
 
     // ±2 g gives the best sensitivity for sub-1 g motion detection.
     accel.set_range(Range::G2).await.unwrap();
-    accel.set_output_data_rate(OutputDataRate::Hz100).await.unwrap();
+    accel
+        .set_output_data_rate(OutputDataRate::Hz100)
+        .await
+        .unwrap();
     accel.set_noise_mode(NoiseMode::LowNoise).await.unwrap();
 
-    let act_thresh   = Range::G2.mg_to_threshold_code(ACT_THRESHOLD_MG);
+    let act_thresh = Range::G2.mg_to_threshold_code(ACT_THRESHOLD_MG);
     let inact_thresh = Range::G2.mg_to_threshold_code(INACT_THRESHOLD_MG);
 
-    accel.configure_activity(ActivityConfig::absolute(act_thresh, ACT_TIME_SAMPLES))
-        .await.unwrap();
-    accel.configure_inactivity(InactivityConfig::absolute(inact_thresh, INACT_TIME_SAMPLES))
-        .await.unwrap();
+    accel
+        .configure_activity(ActivityConfig::absolute(act_thresh, ACT_TIME_SAMPLES))
+        .await
+        .unwrap();
+    accel
+        .configure_inactivity(InactivityConfig::absolute(inact_thresh, INACT_TIME_SAMPLES))
+        .await
+        .unwrap();
 
     // Loop mode: ADXL362 alternates autonomously — activity → wake → inactivity → autosleep.
     // ACT_EN and INACT_EN are already set by the configure_* calls above.
@@ -103,10 +110,16 @@ async fn main(_spawner: Spawner) {
 
     // Route AWAKE (level) to INT2, active-high.
     // AWAKE is only meaningful in linked / loop mode (Rev. G §5).
-    accel.map_interrupts(
-        IntPin::Int2,
-        IntSources { awake: true, ..Default::default() },
-    ).await.unwrap();
+    accel
+        .map_interrupts(
+            IntPin::Int2,
+            IntSources {
+                awake: true,
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
 
     accel.start_measurement().await.unwrap();
     Timer::after_millis(40).await; // 4/ODR settle

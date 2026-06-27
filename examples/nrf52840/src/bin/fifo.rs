@@ -67,8 +67,8 @@ async fn main(_spawner: Spawner) {
     config.mode = spim::MODE_0;
 
     let spim = Spim::new(p.SPI3, Irqs, p.P0_29, p.P0_28, p.P0_30, config);
-    let cs   = Output::new(p.P0_31, Level::High, OutputDrive::Standard);
-    let spi  = ExclusiveDevice::new_no_delay(spim, cs).unwrap();
+    let cs = Output::new(p.P0_31, Level::High, OutputDrive::Standard);
+    let spi = ExclusiveDevice::new_no_delay(spim, cs).unwrap();
 
     let mut accel = Adxl362::new(spi).await.expect("ADXL362 not found");
 
@@ -76,28 +76,37 @@ async fn main(_spawner: Spawner) {
     Timer::after_millis(1).await; // ≥ 0.5 ms post-reset (Rev. G §13)
 
     accel.set_range(Range::G4).await.unwrap();
-    accel.set_output_data_rate(OutputDataRate::Hz100).await.unwrap();
+    accel
+        .set_output_data_rate(OutputDataRate::Hz100)
+        .await
+        .unwrap();
 
     // Stream FIFO: newest sample overwrites oldest; fire INT1 at the watermark.
-    accel.set_fifo(FifoMode::Stream, false, WATERMARK).await.unwrap();
+    accel
+        .set_fifo(FifoMode::Stream, false, WATERMARK)
+        .await
+        .unwrap();
 
     // Raise INT1 on watermark or overrun so missed samples are surfaced.
-    accel.map_interrupts(
-        IntPin::Int1,
-        IntSources {
-            fifo_watermark: true,
-            fifo_overrun:   true,
-            ..Default::default()
-        },
-    ).await.unwrap();
+    accel
+        .map_interrupts(
+            IntPin::Int1,
+            IntSources {
+                fifo_watermark: true,
+                fifo_overrun: true,
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
 
     accel.start_measurement().await.unwrap();
     Timer::after_millis(40).await; // 4/ODR settle
 
     // INT1 is driven by the ADXL362 — no MCU pull resistor.
     let mut int1 = Input::new(p.P0_02, Pull::None);
-    let range    = accel.range(); // cache once; avoids a register read per iteration
-    let mut buf  = [0u8; BUF_LEN];
+    let range = accel.range(); // cache once; avoids a register read per iteration
+    let mut buf = [0u8; BUF_LEN];
 
     info!(
         "ADXL362 FIFO streaming at 100 Hz, watermark = {} samples",
@@ -114,7 +123,7 @@ async fn main(_spawner: Spawner) {
 
         // Drain whatever the FIFO currently holds, up to our buffer.
         // Keep byte count even — the driver requires even-length FIFO reads.
-        let entries    = accel.fifo_entries().await.unwrap();
+        let entries = accel.fifo_entries().await.unwrap();
         let byte_count = ((entries as usize) * 2).min(BUF_LEN) & !1;
 
         // read_fifo_sets fills buf[..byte_count] from the FIFO, then returns an

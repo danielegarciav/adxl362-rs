@@ -55,10 +55,12 @@ async fn main(_spawner: Spawner) {
 
     // Spim::new parameter order: (peripheral, irq, sck, miso, mosi, config)
     let spim = Spim::new(p.SPI3, Irqs, p.P0_29, p.P0_28, p.P0_30, config);
-    let cs   = Output::new(p.P0_31, Level::High, OutputDrive::Standard);
-    let spi  = ExclusiveDevice::new_no_delay(spim, cs).unwrap();
+    let cs = Output::new(p.P0_31, Level::High, OutputDrive::Standard);
+    let spi = ExclusiveDevice::new_no_delay(spim, cs).unwrap();
 
-    let mut accel = Adxl362::new(spi).await.expect("ADXL362 not found — check wiring and VDD");
+    let mut accel = Adxl362::new(spi)
+        .await
+        .expect("ADXL362 not found — check wiring and VDD");
 
     // Soft-reset guarantees a clean register state after a warm reboot.
     accel.soft_reset().await.unwrap();
@@ -66,7 +68,10 @@ async fn main(_spawner: Spawner) {
 
     // All configuration must happen while the device is in Standby (power-on default).
     accel.set_range(Range::G4).await.unwrap();
-    accel.set_output_data_rate(OutputDataRate::Hz100).await.unwrap();
+    accel
+        .set_output_data_rate(OutputDataRate::Hz100)
+        .await
+        .unwrap();
     accel.set_noise_mode(NoiseMode::LowNoise).await.unwrap();
     accel.start_measurement().await.unwrap();
 
