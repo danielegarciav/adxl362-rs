@@ -1,0 +1,36 @@
+[package]
+name = "adxl362"
+version = "0.1.0"
+edition = "2024"
+description = "no_std embedded-hal 1.0 driver for the ADXL362 ultra-low-power 3-axis accelerometer"
+license = "MIT OR Apache-2.0"
+keywords = ["adxl362", "accelerometer", "embedded-hal", "no-std", "embassy"]
+categories = ["embedded", "no-std", "hardware-support"]
+
+[lib]
+name = "adxl362"
+
+[features]
+# Async surface via embedded-hal-async (default; Embassy projects use this).
+default = ["async"]
+# Async surface — brings in embedded-hal-async.
+async = ["dep:embedded-hal-async"]
+# Blocking / sync surface — strips async/await via maybe-async.
+# Use with --no-default-features --features blocking.
+blocking = ["maybe-async/is_sync"]
+# f32 g and °C conversions.
+float = []
+# defmt::Format derives on public types.
+defmt = ["dep:defmt"]
+
+[dependencies]
+embedded-hal = "1.0"
+embedded-hal-async = { version = "1.0", optional = true }
+# maybe-async: generates sync code when the `blocking` feature enables is_sync;
+# keeps async code otherwise (async is the default).
+maybe-async = "0.2"
+defmt = { version = "1", optional = true }
+
+[dev-dependencies]
+embedded-hal-mock = { version = "0.11", features = ["eh1"] }
+tokio = { version = "1", features = ["macros", "rt"] }

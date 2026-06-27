@@ -1,0 +1,9 @@
+[target.'cfg(all(target_arch = "arm", target_os = "none"))']
+# Replace nRF52840_xxAA with your exact chip variant from `probe-rs chip list`
+runner = "probe-rs run --chip nRF52840_xxAA"
+
+[build]
+target = "thumbv7em-none-eabi"
+
+[env]
+DEFMT_LOG = "trace"
