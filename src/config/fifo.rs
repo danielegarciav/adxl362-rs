@@ -1,6 +1,6 @@
 //! FIFO configuration and data parsing.
 
-/// FIFO operating mode (FIFO_CONTROL bits [1:0]).
+/// FIFO operating mode (FIFO_CONTROL bits `[1:0]`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum FifoMode {
@@ -14,7 +14,7 @@ pub enum FifoMode {
     Triggered = 0b11,
 }
 
-/// Axis/source tag embedded in each 16-bit FIFO word (bits [15:14]).
+/// Axis/source tag embedded in each 16-bit FIFO word (bits `[15:14]`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum FifoTag {
@@ -41,7 +41,7 @@ pub struct FifoSample {
 impl FifoSample {
     /// Parse one 16-bit FIFO word (LSB-first as read from the bus).
     ///
-    /// Bits [15:14] = tag; bits [11:0] = 12-bit signed value (bits [13:12] are
+    /// Bits `[15:14]` = tag; bits `[11:0]` = 12-bit signed value (bits `[13:12]` are
     /// sign extension of bit 11 inserted by the device).
     #[inline]
     pub fn from_raw_word(word: u16) -> Self {

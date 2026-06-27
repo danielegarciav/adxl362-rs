@@ -1,6 +1,6 @@
 //! POWER_CTL register types.
 
-/// Noise control mode (POWER_CTL bits [5:4], `LOW_NOISE[1:0]`).
+/// Noise control mode (POWER_CTL bits `[5:4]`, `LOW_NOISE[1:0]`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum NoiseMode {

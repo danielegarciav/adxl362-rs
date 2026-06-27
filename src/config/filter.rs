@@ -1,6 +1,6 @@
 //! FILTER_CTL register types: measurement range, output data rate, filter bandwidth.
 
-/// Measurement range (FILTER_CTL bits [7:6]).
+/// Measurement range (FILTER_CTL bits `[7:6]`).
 ///
 /// Scale factors are from Rev. G Table 1.  The ±8 g row is **235 LSB/g**, not the
 /// intuitively expected 250 — using 250 would introduce ~6 % error.
@@ -55,7 +55,7 @@ impl Range {
     }
 }
 
-/// Output data rate (FILTER_CTL bits [2:0]).
+/// Output data rate (FILTER_CTL bits `[2:0]`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum OutputDataRate {
