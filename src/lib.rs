@@ -33,7 +33,11 @@
 #![deny(missing_docs)]
 
 #[cfg(not(any(feature = "async", feature = "blocking")))]
-compile_error!("enable either the `async` or `blocking` feature");
+compile_error!(
+    "adxl362: no feature surface enabled. `async` is the default, so this usually means you set \
+     `default-features = false` without also picking a surface — add `features = [\"blocking\"]` \
+     for the sync API, or `features = [\"async\"]` to keep the async one."
+);
 
 #[cfg(all(feature = "async", feature = "blocking"))]
 compile_error!(

@@ -35,6 +35,15 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo test --no-default-features --features blocking
 
+  msrv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Keep in sync with `rust-version` in Cargo.toml.
+      - uses: dtolnay/rust-toolchain@1.87.0
+      - run: cargo build --no-default-features --features blocking
+      - run: cargo build
+
   feature-combos:
     runs-on: ubuntu-latest
     strategy:
@@ -56,7 +65,7 @@ jobs:
       matrix:
         include:
           - features: "--no-default-features"
-            expect: "enable either the `async` or `blocking` feature"
+            expect: "no feature surface enabled"
           - features: "--no-default-features --features async,blocking"
             expect: "mutually exclusive"
     steps:
