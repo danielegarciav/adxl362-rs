@@ -54,16 +54,25 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        features:
-          - "--no-default-features"
-          - "--no-default-features --features async,blocking"
+        include:
+          - features: "--no-default-features"
+            expect: "enable either the `async` or `blocking` feature"
+          - features: "--no-default-features --features async,blocking"
+            expect: "mutually exclusive"
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - name: Confirm this combo is rejected at compile time
+      - name: Confirm this combo is rejected by the intended compile_error! guard
         run: |
-          if cargo build ${{ matrix.features }}; then
+          if output=$(cargo build ${{ matrix.features }} 2>&1); then
             echo "expected a compile_error! for '${{ matrix.features }}' but the build succeeded"
+            exit 1
+          fi
+          if ! grep -qF '${{ matrix.expect }}' <<< "$output"; then
+            echo "build failed as expected, but not with the guard's error message"
+            echo "expected to find: ${{ matrix.expect }}"
+            echo "--- actual output ---"
+            echo "$output"
             exit 1
           fi
 
