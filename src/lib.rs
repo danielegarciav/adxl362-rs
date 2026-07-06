@@ -8,6 +8,7 @@
 //! | Feature | Default | Description |
 //! |---------|---------|-------------|
 //! | `async` | ✓ | Async surface via `embedded-hal-async`; disable for blocking-only. |
+//! | `blocking` | | Sync surface; use with `--no-default-features --features blocking`. |
 //! | `float` | | `f32` g / °C conversions via `read_accel_g` / `Temperature::to_celsius`. |
 //! | `defmt` | | Derive `defmt::Format` on all public types. |
 //!
@@ -30,6 +31,15 @@
 
 #![cfg_attr(not(test), no_std)]
 #![deny(missing_docs)]
+
+#[cfg(not(any(feature = "async", feature = "blocking")))]
+compile_error!("enable either the `async` or `blocking` feature");
+
+#[cfg(all(feature = "async", feature = "blocking"))]
+compile_error!(
+    "`async` and `blocking` are mutually exclusive — enable exactly one (blocking wins silently \
+     via maybe-async otherwise)"
+);
 
 pub mod config;
 pub mod data;

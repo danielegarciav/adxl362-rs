@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all -- --check
+
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - run: cargo clippy --no-default-features --features blocking --all-targets -- -D warnings
+      - run: cargo clippy --all-targets -- -D warnings
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test --no-default-features --features blocking
+
+  feature-combos:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        features:
+          - "--no-default-features --features blocking"
+          - "--no-default-features --features async"
+          - "--features float"
+          - "--features defmt"
+          - "--no-default-features --features blocking,float,defmt"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build ${{ matrix.features }}
+
+  feature-combos-must-fail:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        features:
+          - "--no-default-features"
+          - "--no-default-features --features async,blocking"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Confirm this combo is rejected at compile time
+        run: |
+          if cargo build ${{ matrix.features }}; then
+            echo "expected a compile_error! for '${{ matrix.features }}' but the build succeeded"
+            exit 1
+          fi
+
+  no-std:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: thumbv7em-none-eabi
+      - run: cargo build --no-default-features --features blocking --target thumbv7em-none-eabi
+      - run: cargo build --target thumbv7em-none-eabi
+
+  examples:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: examples/nrf52840
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: thumbv7em-none-eabi
+      - run: cargo build --bin basic --release
+      - run: cargo build --bin motion_interrupt --release
+      - run: cargo build --bin fifo --release
