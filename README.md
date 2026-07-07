@@ -1,5 +1,7 @@
 # adxl362-rs
 
+[![CI](https://github.com/danielegarciav/adxl362-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/danielegarciav/adxl362-rs/actions/workflows/ci.yml)
+
 `no_std` embedded-hal 1.0 driver for the Analog Devices ADXL362 ultra-low-power 3-axis MEMS accelerometer.
 
 ## Features

@@ -2,13 +2,20 @@
 name = "adxl362"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.87"
 description = "no_std embedded-hal 1.0 driver for the ADXL362 ultra-low-power 3-axis accelerometer"
 license = "MIT OR Apache-2.0"
+repository = "https://github.com/danielegarciav/adxl362-rs"
 keywords = ["adxl362", "accelerometer", "embedded-hal", "no-std", "embassy"]
 categories = ["embedded", "no-std", "hardware-support"]
+exclude = ["docs/"]
 
 [lib]
 name = "adxl362"
+
+[package.metadata.docs.rs]
+# Default features already include `async`; `blocking` is mutually exclusive with it.
+features = ["float", "defmt"]
 
 [features]
 # Async surface via embedded-hal-async (default; Embassy projects use this).
