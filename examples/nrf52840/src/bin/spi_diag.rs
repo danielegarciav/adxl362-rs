@@ -119,6 +119,9 @@ async fn main(_spawner: Spawner) {
     config.mode = spim::MODE_0;
 
     let mut found: Option<(&str, usize, usize, usize, usize)> = None;
+    // A wiring whose reply is neither all-0x00 nor all-0xFF is being driven by
+    // *something*, even if the IDs are wrong. Worth a closer look in phase 3.
+    let mut responsive: Option<(usize, usize, usize, usize)> = None;
 
     for cs_idx in CS_CANDIDATES {
         for (bus_label, bus) in BUSES {
@@ -158,6 +161,12 @@ async fn main(_spawner: Spawner) {
                     continue;
                 }
 
+                let ids = &rx[2..6];
+                let idle = ids.iter().all(|&b| b == 0x00) || ids.iter().all(|&b| b == 0xFF);
+                if !idle && responsive.is_none() {
+                    responsive = Some((cs_idx, s, mi, mo));
+                }
+
                 let matched = rx[2] == 0xAD && rx[4] == 0xF2;
                 if matched {
                     found = Some((bus_label, cs_idx, s, mi, mo));
@@ -177,7 +186,143 @@ async fn main(_spawner: Spawner) {
         }
     }
 
-    // ── Phase 3: verdict ────────────────────────────────────────────────────
+    // ── Phase 3: mode / speed sweep on whichever wiring answered ────────────
+    //
+    // A reply that is close to the expected IDs but not equal to them means the
+    // part is alive and we are sampling it wrong. Wrong CPOL/CPHA shifts the
+    // whole stream by a bit; marginal signal integrity corrupts bits at high
+    // clock but cleans up when slowed down. The two look different here.
+    if found.is_none()
+        && let Some((cs_idx, s, mi, mo)) = responsive
+    {
+        info!("── phase 3: mode/speed sweep on the wiring that answered ──");
+        info!(
+            "cs={} sck={} miso={} mosi={}  (expect ad=0xad mst=0x1d part=0xf2)",
+            NAMES[cs_idx], NAMES[s], NAMES[mi], NAMES[mo]
+        );
+
+        const MODES: [(&str, spim::Mode); 4] = [
+            ("MODE_0", spim::MODE_0),
+            ("MODE_1", spim::MODE_1),
+            ("MODE_2", spim::MODE_2),
+            ("MODE_3", spim::MODE_3),
+        ];
+        const SPEEDS: [(&str, spim::Frequency); 3] = [
+            ("125k", spim::Frequency::K125),
+            ("1M", spim::Frequency::M1),
+            ("4M", spim::Frequency::M4),
+        ];
+
+        for (mode_name, mode) in MODES {
+            for (speed_name, freq) in SPEEDS {
+                let mut cfg = spim::Config::default();
+                cfg.mode = mode;
+                cfg.frequency = freq;
+
+                // Three passes: a stable wrong answer is a protocol problem,
+                // an unstable one is electrical.
+                for pass in 0..3u8 {
+                    let [cs_pin, sck, miso, mosi] =
+                        pins.get_disjoint_mut([cs_idx, s, mi, mo]).unwrap();
+                    let mut cs =
+                        Output::new(cs_pin.reborrow(), Level::High, OutputDrive::Standard);
+                    let mut spim = Spim::new(
+                        p.SPI3.reborrow(),
+                        Irqs,
+                        sck.reborrow(),
+                        miso.reborrow(),
+                        mosi.reborrow(),
+                        cfg.clone(),
+                    );
+
+                    let tx = [0x0B, 0x00, 0x00, 0x00, 0x00, 0x00];
+                    let mut rx = [0u8; 6];
+
+                    Timer::after_micros(50).await;
+                    cs.set_low();
+                    Timer::after_micros(50).await;
+                    let r = spim.transfer(&mut rx, &tx).await;
+                    Timer::after_micros(50).await;
+                    cs.set_high();
+
+                    if r.is_err() {
+                        warn!("  {} {} pass{}: SPI error", mode_name, speed_name, pass);
+                        continue;
+                    }
+
+                    let hit = rx[2] == 0xAD && rx[4] == 0xF2;
+                    info!(
+                        "  {} {} pass{}: raw={:02x} ad={:#04x} mst={:#04x} part={:#04x} rev={:#04x} {}",
+                        mode_name,
+                        speed_name,
+                        pass,
+                        rx,
+                        rx[2],
+                        rx[3],
+                        rx[4],
+                        rx[5],
+                        if hit { "<-- MATCH" } else { "" }
+                    );
+
+                    if hit && found.is_none() {
+                        found = Some(("phase 3 sweep", cs_idx, s, mi, mo));
+                        info!("  ^ correct IDs at {} {}", mode_name, speed_name);
+                    }
+
+                    Timer::after_millis(2).await;
+                }
+            }
+        }
+    }
+
+    // ── Phase 3b: is MISO actually driven? ──────────────────────────────────
+    //
+    // With CS asserted the ADXL362 owns MISO and holds it at a defined level.
+    // A pin that instead tracks whichever internal pull we apply is high-Z:
+    // the part is unpowered, dead, or not on this pin. This test only became
+    // meaningful once the bus stopped being shorted to the rail.
+    if found.is_none()
+        && let Some((cs_idx, _s, mi, _mo)) = responsive
+    {
+        info!("── phase 3b: MISO drive test ──");
+
+        for (label, assert_cs) in [("CS asserted (low)", true), ("CS idle (high)", false)] {
+            let [cs_pin, miso] = pins.get_disjoint_mut([cs_idx, mi]).unwrap();
+            let mut cs = Output::new(
+                cs_pin.reborrow(),
+                if assert_cs { Level::Low } else { Level::High },
+                OutputDrive::Standard,
+            );
+            let _ = &mut cs;
+            Timer::after_millis(1).await;
+
+            let mut flex = Flex::new(miso.reborrow());
+
+            flex.set_as_input(Pull::Up);
+            Timer::after_millis(2).await;
+            let with_pullup = flex.is_high();
+
+            flex.set_as_input(Pull::Down);
+            Timer::after_millis(2).await;
+            let with_pulldown = flex.is_high();
+
+            if with_pullup == with_pulldown {
+                info!(
+                    "  {}: {} held {} against both pulls — actively driven",
+                    label,
+                    NAMES[mi],
+                    if with_pullup { "high" } else { "low" }
+                );
+            } else {
+                warn!(
+                    "  {}: {} follows the internal pull — HIGH-Z, nothing driving it",
+                    label, NAMES[mi]
+                );
+            }
+        }
+    }
+
+    // ── Phase 4: verdict ────────────────────────────────────────────────────
     match found {
         Some((bus_label, cs_idx, s, mi, mo)) => {
             info!("── result: ADXL362 found on {} ──", bus_label);
